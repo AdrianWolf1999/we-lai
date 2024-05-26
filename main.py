@@ -1,37 +1,31 @@
-import os
-from dotenv import load_dotenv
+# TODO: migrate the bottom half into extractor.py and visualiser.py
+
 import matplotlib.pyplot as plt
 import numpy as np
-import polyline
-import requests
 from math import radians, cos, sin, asin, sqrt
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Access the API key
-api_key = os.getenv("API_KEY")
-
-def get_route(origin, destination, api_key):
-    url = f"https://maps.googleapis.com/maps/api/directions/json?origin={origin}&destination={destination}&key={api_key}"
-    response = requests.get(url)
-    data = response.json()
-    return data
+from services.webcrawler import WebCrawler
+from services.extractor import Extractor
 
 # Example usage
-# origin = "48.783391,9.180221"
-# destination = "48.779477,9.179306"
+origin = "48.783391,9.180221"
+destination = "48.779477,9.179306"
+
+if __name__ == "__main__":
+    # Get the route in json format from Google API
+    crawler = WebCrawler()
+    extractor = Extractor()
+
+    route_data = crawler.get_route(origin, destination, crawler.load_api_key())
+    print(route_data)
+
+    decoded_polyline = extractor.extract_map(route_data)
 
 
-# route_data = get_route(origin, destination, api_key)
-# print(route_data)
+####################################################################
+# TODO: Migrate from here downwards:
 
-
-# Encoded polyline string
-encoded_polyline = "a_whHu_`w@KK\\_APm@p@yB|AaGNu@Ia@GWAXUz@]`BQx@kAnEUv@gAtCaB`EUn@VX`@j@t@z@~AhBn@l@d@X\\N|APvEZbBXxAd@hBx@LMJUBQa@]{@c@a@M]KJc@Ry@v@mCbAmE"
-
-# Decode the polyline
-decoded_polyline = polyline.decode(encoded_polyline)
+# encoded_polyline = "a_whHu_`w@KK\\_APm@p@yB|AaGNu@Ia@GWAXUz@]`
+# BQx@kAnEUv@gAtCaB`EUn@VX`@j@t@z@~AhBn@l@d@X\\N|APvEZbBXxAd@hBx@LMJUBQa@]{@c@a@M]KJc@Ry@v@mCbAmE"
 
 # Extract latitude and longitude
 latitudes = [point[0] for point in decoded_polyline]
@@ -65,14 +59,13 @@ end_lat, end_lon = decoded_polyline[-1]
 # Plot the polyline with waypoints
 plt.figure(figsize=(10, 6))
 plt.plot(longitudes, latitudes, 'b-', linewidth=2)
-plt.scatter(waypoint_longitudes, waypoint_latitudes, color='green', label='Waypoints (every 10m)')
-plt.scatter([start_lon, end_lon], [start_lat, end_lat], color='red', label='Start/End')
+plt.scatter(waypoint_longitudes, waypoint_latitudes,
+            color='green', label='Waypoints (every 10m)')
+plt.scatter([start_lon, end_lon], [start_lat, end_lat],
+            color='red', label='Start/End')
 plt.xlabel('Longitude')
 plt.ylabel('Latitude')
 plt.title('Decoded Polyline with Waypoints (every 10 meters)')
 plt.legend()
 plt.grid(True)
 plt.show()
-
-
-
