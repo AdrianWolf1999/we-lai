@@ -1,5 +1,3 @@
-# TODO: preprocess the decoded polyline further into a map (like bottom half of main)
-
 import polyline
 
 
