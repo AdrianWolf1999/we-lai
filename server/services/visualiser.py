@@ -1,4 +1,4 @@
-# TODO
+# TODO: The whole visualisation process should run on the client side
 
 import matplotlib.pyplot as plt
 
