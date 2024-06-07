@@ -5,3 +5,6 @@ polyline
 requests
 pathlib
 flask
+pandas
+shapely
+folium

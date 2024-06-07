@@ -3,7 +3,8 @@ from services.extractor import Extractor
 from services.mapper import Mapper
 from services.visualiser import Visualiser
 from services.webcrawler import WebCrawler
-
+from heuristic.heatmap.dataset import Dataset
+from heuristic.heatmap.heatmap_generator import Heatmap
 # Example usage
 ORIGIN = "48.783391,9.180221"
 DESTINATION = "48.779477,9.179306"
@@ -16,6 +17,8 @@ crawler = WebCrawler()
 extractor = Extractor()
 mapper = Mapper()
 visualiser = Visualiser()
+dataset = Dataset()
+heatmap = Heatmap()
 
 @app.route("/")
 def index():
