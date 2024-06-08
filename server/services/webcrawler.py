@@ -83,10 +83,7 @@ class WebCrawlerHERE():
 
     def load_api_key(self):
         # Try to load environment variables from .env file in the current directory
-        env_file_cwd = Path.cwd() / '.env'
-        if env_file_cwd.exists():
-            # Load environment variables from .env file
-            load_dotenv(env_file_cwd)        
+        load_dotenv()
         
         # Load the HERE API key from a file or environment variable
         api_key = os.getenv("HERE_API_KEY")
@@ -97,14 +94,18 @@ class WebCrawlerHERE():
     
     def get_route(self, origin, destination):
         # Construct the HERE API request
-        api_endpoint = "https://route.ls.hereapi.com/routing/7.2/calculateRoute.json"
+        api_endpoint = "https://router.hereapi.com/v8/routes"
         params = {
             "apiKey": self.api_key,
-            "waypoint0": origin,
-            "waypoint1": destination,
-            "mode": "fastest;car;traffic:enabled",
-            "representation": "display"
+            "origin": origin,
+            "destination": destination,
+            "transportMode": "pedestrian",
+            "return": "polyline"
         }
+        
+        # Print the full URL for debugging
+        full_url = requests.Request('GET', api_endpoint, params=params).prepare().url
+        print(f"Request URL: {full_url}")
 
         # Send the API request
         response = requests.get(api_endpoint, params=params)
@@ -112,10 +113,10 @@ class WebCrawlerHERE():
         # Parse the HERE API response
         if response.status_code == 200:
             data = response.json()
-            route = data["response"]["route"][0]
-            return route
+            return data
         else:
             print("Error: Failed to retrieve route data")
+            print("Status code: ", response.status_code)
             return None
 
 # just for testing:

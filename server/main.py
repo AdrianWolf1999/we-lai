@@ -1,20 +1,20 @@
 from flask import Flask, request, jsonify, send_from_directory
-from services.extractor import Extractor
+from services.extractor import ExtractorHERE
 from services.mapper import Mapper
 from services.visualiser import Visualiser
-from services.webcrawler import WebCrawler
+from services.webcrawler import WebCrawlerHERE
 from heuristic.heatmap.dataset import Dataset
 from heuristic.heatmap.heatmap_generator import Heatmap
 # Example usage
-ORIGIN = "48.783391,9.180221"
-DESTINATION = "48.779477,9.179306"
+ORIGIN = "48.778762788627816, 9.178535664336055"
+DESTINATION = "48.77781060331757, 9.149952002086765"
 
 app = Flask(__name__, static_folder="../client", static_url_path="")
 
 
 # Initialize services
-crawler = WebCrawler()
-extractor = Extractor()
+crawler = WebCrawlerHERE()
+extractor = ExtractorHERE()
 mapper = Mapper()
 visualiser = Visualiser()
 dataset = Dataset()
@@ -32,7 +32,7 @@ def get_safe_route():
     destination = request.args.get('destination')
     
     if origin and destination:
-        route_data = crawler.get_route(origin, destination, crawler.load_api_key())
+        route_data = crawler.get_route(origin, destination)
         decoded_polyline = extractor.extract_map(route_data)
         waypoints = mapper.add_waypoints(decoded_polyline)
         map_values = mapper.add_map_values(decoded_polyline, waypoints)

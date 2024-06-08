@@ -85,5 +85,5 @@ class Mapper():
             "end_lat": end_lat,
             "end_lon": end_lon
         }
-        
+
         return map_values
