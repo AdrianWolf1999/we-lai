@@ -1,21 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <title>Route Finder</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 </head>
 <body>
-    <h1>Route Finder</h1>
-    <form>
-        <label for="origin">Origin:</label>
-        <input type="text" id="origin" name="origin"><br><br>
-        <label for="destination">Destination:</label>
-        <input type="text" id="destination" name="destination"><br><br>
-        <button id="submit">Find Route</button>
-    </form>
-    <div id="map"></div>
+    <div id="mapContainer"></div>
+    <div id="topBarContainer">
+        <div id="searchBar">
+            <input type="text" id="searchInput" placeholder="Search for a location" />
+            <div id="suggestions"></div>
+        </div>
+        <button id="toggleMetaButton">Toggle Meta</button>
+        <button id="bringMeHomeButton">Bring Me Home</button>
+    </div>
 
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
