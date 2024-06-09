@@ -73,25 +73,8 @@ def get_heatmap():
 	}
 	return data
 
-def get_route(origin, destination, profile):
-	initial_route = api_routing_call(origin, destination, [], profile)
 
-	if 'paths' in initial_route and initial_route['paths']:
-		waypoints = find_nearby_safe_places(initial_route, safePlaceCoords)
-
-		print(waypoints)
-
-		final_route = {}
-
-		if waypoints:		
-			final_route = api_routing_call(origin, destination, waypoints, profile)
-		else:
-			final_route = initial_route
-
-		return final_route
-
-
-def api_routing_call(origin, destination, waypoints, profile):
+def api_routing_call(origin, destination, waypoints, profile, optimize):
 	url = 'https://graphhopper.com/api/1/route'
 	headers = {
 		'Content-Type': 'application/json'
@@ -104,8 +87,8 @@ def api_routing_call(origin, destination, waypoints, profile):
 			destination.split(',')  # Target coordinates
 		],
 		"ch.disable": True,
-		"points_encoded": False,
-		"algorith": "alternative_route",
+		"points_encoded": False,		
+		"optimize": optimize,
 		"custom_model": {
 			"priority": [
 				{
@@ -148,8 +131,6 @@ def api_routing_call(origin, destination, waypoints, profile):
 	"key": apiKey
 	}
 
-	print(data)
-
 	try:
 		response = requests.post(url, json=data, headers=headers, params=query)
 
@@ -164,15 +145,66 @@ def api_routing_call(origin, destination, waypoints, profile):
 	
 	return ret
 
+def get_route(origin, destination, profile):
+	initial_route = api_routing_call(origin, destination, [], profile, "false")
 
+	if 'paths' in initial_route and initial_route['paths']:
+		waypoints = find_nearby_safe_places(initial_route, safePlaceCoords, 0.05, 0.1)
+
+		print("Waypoints:")
+		print(waypoints)
+		print("###########")
+
+		final_route = {}
+
+		if waypoints:		
+			final_route = api_routing_call(origin, destination, waypoints, profile, "false")
+		else:
+			final_route = initial_route
+
+		return final_route
 
 def is_within_distance(coord1, coord2, max_distance_km=0.5):
     return geodesic(coord1, coord2).km <= max_distance_km
 
-def find_nearby_safe_places(route, safe_places, max_distance_km=0.1):
-    waypoints = []
-    for segment in route['paths'][0]['points']['coordinates']:
-        for safe_place in safe_places:
-            if is_within_distance(segment, safe_place, max_distance_km):
-                waypoints.append(f"{safe_place[0]},{safe_place[1]}")
-    return list(set(waypoints))
+def find_nearby_safe_places(route, safe_places, max_distance_for_no_detour=0.1, max_distance_for_detour=0.2):
+	route = route['paths'][0]
+	total_distance = route['distance']
+
+	waypoints = []
+
+	num_segments = len(route['points']['coordinates'])
+	last_coordinate = route['points']['coordinates'][0]
+	distance_since_last_checkpoint = 0
+	distance_since_start = 0
+	checkpoint_interval = 0.5
+	i = 0
+
+	while i < num_segments:
+		current_coordinate = route['points']['coordinates'][i]
+		distance = geodesic(current_coordinate, last_coordinate).kilometers
+		distance_since_last_checkpoint = distance_since_last_checkpoint + distance
+		distance_since_start = distance_since_start + distance
+		last_coordinate = current_coordinate
+
+		more_than_250m_from_finish = (total_distance - distance_since_start) > 0.25
+		new_checkpoint_interval_reached = distance_since_last_checkpoint > checkpoint_interval and more_than_250m_from_finish
+
+		if new_checkpoint_interval_reached:
+			for safe_place in safe_places:
+				waypoint_already_close_enough = False
+				if is_within_distance(current_coordinate, safe_place, max_distance_for_no_detour):
+					waypoint_already_close_enough = True
+					break				
+			
+			if waypoint_already_close_enough:
+				distance_since_last_checkpoint = 0
+			else:
+				for safe_place in safe_places:
+					if is_within_distance(current_coordinate, safe_place, max_distance_for_detour):
+						waypoints.append(f"{safe_place[0]},{safe_place[1]}")
+						distance_since_last_checkpoint = 0
+						break
+
+		i = i + 1
+	return list(set(waypoints))
