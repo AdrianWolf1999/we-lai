@@ -1,5 +1,6 @@
 import requests
-import json
+from geopy.distance import geodesic
+
 
 apiKey = 'be7af08d-d658-48b9-9c98-a42e12bedad8'
 
@@ -72,8 +73,25 @@ def get_heatmap():
 	}
 	return data
 
-
 def get_route(origin, destination, profile):
+	initial_route = api_routing_call(origin, destination, [], profile)
+
+	if 'paths' in initial_route and initial_route['paths']:
+		waypoints = find_nearby_safe_places(initial_route, safePlaceCoords)
+
+		print(waypoints)
+
+		final_route = {}
+
+		if waypoints:		
+			final_route = api_routing_call(origin, destination, waypoints, profile)
+		else:
+			final_route = initial_route
+
+		return final_route
+
+
+def api_routing_call(origin, destination, waypoints, profile):
 	url = 'https://graphhopper.com/api/1/route'
 	headers = {
 		'Content-Type': 'application/json'
@@ -82,6 +100,7 @@ def get_route(origin, destination, profile):
 		"profile": profile,
 		"points": [
 			origin.split(','),  # Source coordinates
+			*[wp.split(',') for wp in waypoints], # waypoints
 			destination.split(',')  # Target coordinates
 		],
 		"ch.disable": True,
@@ -129,6 +148,8 @@ def get_route(origin, destination, profile):
 	"key": apiKey
 	}
 
+	print(data)
+
 	try:
 		response = requests.post(url, json=data, headers=headers, params=query)
 
@@ -142,3 +163,16 @@ def get_route(origin, destination, profile):
 		ret = {}
 	
 	return ret
+
+
+
+def is_within_distance(coord1, coord2, max_distance_km=0.5):
+    return geodesic(coord1, coord2).km <= max_distance_km
+
+def find_nearby_safe_places(route, safe_places, max_distance_km=0.1):
+    waypoints = []
+    for segment in route['paths'][0]['points']['coordinates']:
+        for safe_place in safe_places:
+            if is_within_distance(segment, safe_place, max_distance_km):
+                waypoints.append(f"{safe_place[0]},{safe_place[1]}")
+    return list(set(waypoints))
