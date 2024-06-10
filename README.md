@@ -1,27 +1,29 @@
-# we-lai
+# WeLai
+
+## Introduction
+
+WeLai is a route planning application that provides safe and efficient routes for users. Our application uses a combination of geospatial data and machine learning algorithms to optimize routes and minimize risk.
 
 ## Setup
 
 1. Create a `.env` file and add `GEO_API_KEY=...`
+2. Install requirements: `pip install -r requirements.txt`
+3. Start the server with: `python3 server/main.py`
+4. Access the client via your browser: `https://localhost:5000/`
 
-2. Install requirements:
+## License
 
-    pip install -r requirements.txt
+WeLai is released under the MIT License.
 
-3. Start the server with:
+## Contributing
 
-    python3 server/main.py
+WeLai is an open-source project, and we welcome contributions from the community. To contribute, please fork the repository, make your changes, and submit a pull request.
 
-4. The client can be accessed via your browser:
+## Maintainers
 
-   https://localhost:5000/
+* Adrian Wolf
+* Pavel Hugaev
 
-5. To call the server function get_safe_map() simply insert in the coordinates for origin, destination and profile.
-   This way a GET request should be sent to https://localhost:5000/route?origin={origin}&destination={destination}&profile={profile}
-   
-   Example:
-   ORIGIN = "48.783391,9.180221"
-   DESTINATION = "48.779477,9.179306"
-   PROFILE = "foot"
+## Acknowledgments
 
-6. The return of this request is the route in json format, which is then displayed by the frontend
+We would like to thank ChatGPT and the Blackbox AI for their contributions to this project.
