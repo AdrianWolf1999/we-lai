@@ -66,12 +66,14 @@ def add_new_polygon():
     safety_score = request.args.get('safetyScore')
     heatmap.add_and_save_new_polygon(polygon, safety_score)
     crawler.load_data_from_csv()
+    return jsonify({"status": "success"})
 
 @app.route('/safe_place', methods=['SET'])
 def add_new_safe_place():
     coordinates = request.args.get('coordinates')
     heatmap.add_and_save_new_safe_place(coordinates)
     crawler.load_data_from_csv()
+    return jsonify({"status": "success"})
 
 
 if __name__ == "__main__":

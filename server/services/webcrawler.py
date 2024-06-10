@@ -14,11 +14,11 @@ class WebCrawler(Heatmap):
     ----------
     api_key : str
         The loaded API key.
-    heatmapCoords : list
+    heatmap_coords : list
         A list of polygons for the heatmap
-    safetyScores : list
+    safety_scores : list
         A list with a single value between 0 and 1 for the safety of each polygon
-    safePlaceCoords : list
+    safe_place_coords : list
         A list of coordinates for safe places
 
     Methods:
@@ -72,7 +72,7 @@ class WebCrawler(Heatmap):
         profile,
         optimize,
         heatmap,
-        safetyScores
+        safety_scores
     ):
         """
         Makes a routing API call to GraphHopper.
@@ -91,7 +91,7 @@ class WebCrawler(Heatmap):
             Whether to optimize the route (e.g., "false")
         heatmap : list
             A list of polygon coordinates to avoid
-        safetyScores : 
+        safety_scores : 
             A safety score for every polygon in the heatmap
 
         RETURNS
@@ -149,7 +149,7 @@ class WebCrawler(Heatmap):
                     "properties": {},
                     "geometry": {"type": "Polygon", "coordinates": [polygon]},
                 }
-                priority = {"else_if": f"in_bad{i}", "multiply_by": f"{safetyScores[i]}"}
+                priority = {"else_if": f"in_bad{i}", "multiply_by": f"{safety_scores[i]}"}
                 data["custom_model"]["areas"]["features"].append(feature)
                 data["custom_model"]["priority"].append(priority)
 
@@ -188,8 +188,8 @@ class WebCrawler(Heatmap):
             [],
             profile,
             "false",
-            self.heatmapCoords,
-            self.safetyScores
+            self.heatmap_coords,
+            self.safety_scores
         )
 
         # print(initial_route)
@@ -210,8 +210,8 @@ class WebCrawler(Heatmap):
                     waypoints,
                     profile,
                     "false",
-                    self.heatmapCoords,
-                    self.safetyScores
+                    self.heatmap_coords,
+                    self.safety_scores
                 )
             else:
                 final_route = initial_route
@@ -287,7 +287,7 @@ class WebCrawler(Heatmap):
             )
 
             if new_checkpoint_interval_reached:
-                for safe_place in self.safePlaceCoords:
+                for safe_place in self.safe_place_coords:
                     waypoint_already_close_enough = False
                     if self.is_within_distance(
                         current_coordinate, safe_place, max_distance_for_no_detour
@@ -298,7 +298,7 @@ class WebCrawler(Heatmap):
                 if waypoint_already_close_enough:
                     distance_since_last_checkpoint = 0
                 else:
-                    for safe_place in self.safePlaceCoords:
+                    for safe_place in self.safe_place_coords:
                         if self.is_within_distance(
                             current_coordinate, safe_place, max_distance_for_detour
                         ):
@@ -312,7 +312,7 @@ class WebCrawler(Heatmap):
 
 # just for testing:
 if __name__ == "__main__":
-    crawler = WebCrawler()
+    crawler = WebCrawler("")
     result = crawler.get_route(
         "48.783391,9.180221",
         "48.779477,9.179306",
