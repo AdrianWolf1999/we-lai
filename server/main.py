@@ -97,6 +97,17 @@ def add_new_safe_place():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": "Server Error: " + str(e)}), 400
+    
+@app.route("/suggestions", methods=["GET"])
+def get_suggestions():
+    try:
+        query = request.args.get("query")
+        d = crawler.get_suggestions(query)
+        print(d)
+        return jsonify(d)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": "Server Error: " + str(e)}), 400
 
 
 if __name__ == "__main__":

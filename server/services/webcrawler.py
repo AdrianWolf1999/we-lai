@@ -95,7 +95,6 @@ class WebCrawler(Heatmap):
         data : dict
             The route data as a JSON dictionary, or an empty dictionary if an exception occurs
         """
-
         try:
             url = "https://graphhopper.com/api/1/route"
             headers = {"Content-Type": "application/json"}
@@ -158,6 +157,20 @@ class WebCrawler(Heatmap):
             response.raise_for_status()
             ret = response.json()
 
+        except requests.exceptions.RequestException as e:
+            print(f"An Exception occured: {e}")
+            ret = {}
+
+        return ret
+
+    def get_suggestions(self, query):
+        try:
+            url = "https://graphhopper.com/api/1/geocode"
+            params = {"q": query, "key": self.api_key}
+
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            ret = response.json()
         except requests.exceptions.RequestException as e:
             print(f"An Exception occured: {e}")
             ret = {}
