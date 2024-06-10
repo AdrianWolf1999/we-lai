@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 
@@ -259,8 +258,6 @@ class WebCrawler(Heatmap):
         """
         # Extract route data
         route_data = route["paths"][0]
-        with open("test.json", "w") as file:
-            json.dump(route, file)
 
         # Create a LineString from route coordinates
         coordinates = route_data["points"]["coordinates"]
