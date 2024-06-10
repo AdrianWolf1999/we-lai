@@ -10,9 +10,9 @@ const defaultRadioButtonLabelElement = document.getElementById('defaultRadioButt
 const polygonRadioButtonLabelElement = document.getElementById('polygonRadioButtonLabel');
 const safePlaceRadioButtonLabelElement = document.getElementById('safePlaceRadioButtonLabel');
 
-const apiKey = "";
-    
 const map = L.map('mapContainer').setView([52.5, 13.4], 16);
+
+let debounceTimer;
 
 let heatmapPolygonCoords = [];
 let safetyScores = [];
@@ -130,29 +130,48 @@ function toggleHeatmap() {
 //--------------------------------------------------------------------------------------------------
 
 // Gets location suggestions from graphhopper for the search string
-function getSuggestions(query) {
-    fetch(`https://graphhopper.com/api/1/geocode?q=${query}&key=${apiKey}`)
-        .then(response => response.json())
-        .then(data => {
-            const suggestions = suggestionsElement;
-            suggestions.innerHTML = '';
-            if (data.hits && data.hits.length > 0) {
-                data.hits.forEach(hit => {
-                    const suggestion = document.createElement('div');
-                    suggestion.textContent = hit.name;
-                    suggestion.addEventListener('click', () => {
-                        selectLocation(hit.point.lat, hit.point.lng, hit.name);
-                    });
-                    suggestions.appendChild(suggestion);
-                });
-                suggestions.style.display = 'block';
-            } else {
-                suggestions.style.display = 'none';
+async function getSuggestions(query) {
+    try {
+        // Construct the URL with query parameters
+        const url = new URL('/suggestions', window.location.origin);
+        url.searchParams.append('query', query);
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
             }
-        })
-        .catch(error => {
-            console.error('Geocoding error:', error);
         });
+
+        const suggestions = await response.json();
+
+        if (suggestions['error'] != undefined) {
+            console.error(suggestions['error']);
+            return;
+        }
+
+        onReceivedSuggestions(suggestions);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+function onReceivedSuggestions(data) {
+    const suggestions = suggestionsElement;
+    suggestions.innerHTML = '';
+    if (data.hits && data.hits.length > 0) {
+        data.hits.forEach(hit => {
+            const suggestion = document.createElement('div');
+            suggestion.textContent = hit.name;
+            suggestion.addEventListener('click', () => {
+                selectLocation(hit.point.lat, hit.point.lng, hit.name);
+            });
+            suggestions.appendChild(suggestion);
+        });
+        suggestions.style.display = 'block';
+    } else {
+        suggestions.style.display = 'none';
+    }
 }
 
 // Sets the input field to the selected location and updates the target coordinates
@@ -426,11 +445,18 @@ toggleMetaButtonElement.addEventListener('click', () => {
 // Search input
 searchInputElement.addEventListener('input', () => {
     const query = searchInputElement.value;
-    if (query.length >= 3) {
-        getSuggestions(query);
-    } else {
-        suggestionsElement.style.display = 'none';
-    }
+
+    // Clear the previous timer if there is one
+    clearTimeout(debounceTimer);
+
+    // Set a new timer
+    debounceTimer = setTimeout(() => {
+        if (query.length >= 3) {
+            getSuggestions(query);
+        } else {
+            suggestionsElement.style.display = 'none';
+        }
+    }, 500); // 500 milliseconds = 0.5 seconds
 });
 
 // Bring me home button
