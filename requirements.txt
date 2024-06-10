@@ -6,3 +6,4 @@ requests
 pathlib
 flask
 geopy
+shapely
