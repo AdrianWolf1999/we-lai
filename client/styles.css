@@ -87,6 +87,7 @@ html, body {
 #bringMeHomeButton {
     padding: 10px;
     height: 40px; /* Match the height of the search input */
+    width: 120px;
     background-color: #2c19f4;
     color: white;
     border: none;
@@ -98,4 +99,24 @@ html, body {
 
 #bringMeHomeButton:hover {
     background-color: #666;
+}
+
+
+#radioButtonContainer {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    display: flex;
+    flex-direction: column; /* Stack the radio buttons vertically */
+    align-items: flex-start; /* Align items to the start of the container */
+    margin-left: auto; /* Push to the left */
+    z-index: 1001; /* Ensure the radio buttons appear above other elements */
+    font-family: Arial, sans-serif; /* Change the font-family to match the buttons */
+}
+
+#radioButtonContainer label {
+    margin-bottom: 10px; /* Add spacing between radio buttons */
+    font-size: 16px;
+    color: #333;
+    font-family: Arial, sans-serif; /* Change the font-family to match the buttons */
 }

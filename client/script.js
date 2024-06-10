@@ -1,17 +1,18 @@
-const map = L.map('mapContainer').setView([52.5, 13.4], 14);
-
 const bringMeHomeButtonElement = document.getElementById('bringMeHomeButton');
 const searchInputElement = document.getElementById('searchInput');
 const suggestionsElement = document.getElementById('suggestions');
 const toggleMetaButtonElement = document.getElementById('toggleMetaButton');
+const defaultRadioButtonElement = document.getElementById('defaultRadioButton');
+const polygonRadioButtonElement = document.getElementById('polygonRadioButton');
+const safePlaceRadioButtonElement = document.getElementById('safePlaceRadioButton');
+    
+const map = L.map('mapContainer').setView([52.5, 13.4], 16);
 
-
-let badPolygonCoords = [];
-let mediumPolygonCoords = [];
+let heatmapPolygonCoords = [];
+let safetyScores = [];
 let safePlaceCoords = [];
 
-let badPolygons = [];
-let mediumPolygons = [];
+let heatmapPolygons = [];
 let safePlaces = [];
 
 let metaShown = true;
@@ -22,11 +23,9 @@ let myMarker = null;
 let routes = [];
 const profile = 'foot';
 
-
-
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap contributors'
-}).addTo(map);
+let editMode = 'default'
+let editPolygonCoords = []
+let editSafePlaceCoords = []
 
 async function getHeatmapData() {
 	try {
@@ -42,9 +41,9 @@ async function getHeatmapData() {
 
         const heatmapData = await response.json();
 		
-		badPolygonCoords = heatmapData.badPolygonCoords;
-		mediumPolygonCoords = heatmapData.mediumPolygonCoords;
-		safePlaceCoords = heatmapData.safePlaceCoords;
+		heatmapPolygonCoords = heatmapData.heatmap.coordinates;
+		safetyScores = heatmapData.heatmap.safetyScores;
+        safePlaceCoords = heatmapData.safePlaces.coordinates;
 
 		createHeatmap();
     } catch (error) {
@@ -52,28 +51,18 @@ async function getHeatmapData() {
     }
 }
 
-// TODO: Why flipping multiple times (and creating flipped data), and not just flipping before api request
-// Function to flip the coordinates
-function flipCoordinates(coords) {
-    return coords.map(polygon => polygon.map(([a, b]) => [b, a]));
+function valueToColor(value) {
+    value = Math.max(0, Math.min(1, value));
+    var hue = value * 60;
+    return `hsl(${hue}, 100%, 50%)`;
 }
-
 function createHeatmap() {
-    // Flip the coordinates for polygons and safe places
-    const flippedBadPolygonCoords = flipCoordinates(badPolygonCoords);
-    const flippedMediumPolygonCoords = flipCoordinates(mediumPolygonCoords);
-    const flippedSafePlaceCoords = safePlaceCoords.map(([a, b]) => [b, a]);
-
-    for (let i in flippedBadPolygonCoords) {
-        badPolygons.push(L.polygon(flippedBadPolygonCoords[i], { color: 'red', fillOpacity: 0.3, weight: 0 }).addTo(map));
+    for (let i in heatmapPolygonCoords) {
+        heatmapPolygons.push(L.polygon(heatmapPolygonCoords[i], { color: valueToColor(safetyScores[i]), fillOpacity: 0.3, weight: 0 }).addTo(map));
     }
 
-    for (let i in flippedMediumPolygonCoords) {
-        mediumPolygons.push(L.polygon(flippedMediumPolygonCoords[i], { color: 'orange', fillOpacity: 0.3 , weight: 0}).addTo(map));
-    }
-
-    for (let i in flippedSafePlaceCoords) {
-        safePlaces.push(L.circle(flippedSafePlaceCoords[i], {color: 'green', fillColor: 'green', fillOpacity: 0.5, weight: 0, radius: 40}).addTo(map));
+    for (let i in safePlaceCoords) {
+        safePlaces.push(L.circle(safePlaceCoords[i], {color: 'green', fillColor: 'green', fillOpacity: 0.5, weight: 0, radius: 40}).addTo(map));
     }
 }
 
@@ -81,21 +70,15 @@ function toggleHeatmap() {
 	metaShown = !metaShown;
 
 	if (metaShown) {
-		for (let i in badPolygons) {
-			badPolygons[i].addTo(map);
-		}
-		for (let i in mediumPolygons) {
-			mediumPolygons[i].addTo(map);
+		for (let i in heatmapPolygons) {
+			heatmapPolygons[i].addTo(map);
 		}
 		for (let i in safePlaces) {
 			safePlaces[i].addTo(map);
 		}
 	} else {
-		for (let i in badPolygons) {
-			map.removeLayer(badPolygons[i]);
-		}
-		for (let i in mediumPolygons) {
-			map.removeLayer(mediumPolygons[i]);
+		for (let i in heatmapPolygons) {
+			map.removeLayer(heatmapPolygons[i]);
 		}
 		for (let i in safePlaces) {
 			map.removeLayer(safePlaces[i]);
@@ -111,6 +94,7 @@ searchInputElement.addEventListener('input', () => {
         suggestionsElement.style.display = 'none';
     }
 });
+
 
 function getSuggestions(query) {
     fetch(`https://graphhopper.com/api/1/geocode?q=${query}&key=${apiKey}`)
@@ -263,6 +247,30 @@ bringMeHomeButtonElement.addEventListener('click', async() => {
     }
 });
 
+defaultRadioButtonElement.addEventListener("change", function(event) {
+    if (event.target.value) {
+        editMode = 'default';
+        bringMeHomeButtonElement.textContent = "Bring Me Home";
+    }
+});
+
+polygonRadioButtonElement.addEventListener("change", function(event) {
+    if (event.target.value) {
+        editMode = 'polygon';
+        bringMeHomeButtonElement.textContent = "Add Polygon";
+    }    
+});
+
+safePlaceRadioButtonElement.addEventListener("change", function(event) {
+    if (event.target.value) {
+        editMode = 'safePlace';
+        bringMeHomeButtonElement.textContent = "Add Safe Place";
+    }
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors'
+}).addTo(map);
 showMyMarker();
 changeMapView(myCoordinates);
 getHeatmapData();

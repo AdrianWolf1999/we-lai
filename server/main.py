@@ -31,13 +31,14 @@ This module is the entry point of the application.
 """
 
 from flask import Flask, request, jsonify, send_from_directory
-from services.routing import Heatmap
+from services.heatmap import Heatmap
 from services.webcrawler import WebCrawler
+import os
 
 app = Flask(__name__, static_folder="../client", static_url_path="")
 
-heatmap = Heatmap()
-crawler = WebCrawler()
+heatmap = Heatmap(os.path.join(os.getcwd(), "server/data"))
+crawler = WebCrawler(os.path.join(os.getcwd(), "server/data"))
 
 @app.route("/")
 def index():
@@ -58,6 +59,19 @@ def get_safe_route():
 @app.route('/heatmap', methods=['GET'])
 def get_heatmap_data():
     return jsonify(heatmap.get_heatmap_and_safe_places())
+
+@app.route('/heatmap', methods=['SET'])
+def add_new_polygon():
+    polygon = request.args.get('polygon')
+    safety_score = request.args.get('safetyScore')
+    heatmap.add_and_save_new_polygon(polygon, safety_score)
+    crawler.load_data_from_csv()
+
+@app.route('/safe_place', methods=['SET'])
+def add_new_safe_place():
+    coordinates = request.args.get('coordinates')
+    heatmap.add_and_save_new_safe_place(coordinates)
+    crawler.load_data_from_csv()
 
 
 if __name__ == "__main__":

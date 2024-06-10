@@ -3,7 +3,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 from geopy.distance import geodesic
-from services.routing import Heatmap
+from services.heatmap import Heatmap
 
 
 class WebCrawler(Heatmap):
@@ -14,12 +14,12 @@ class WebCrawler(Heatmap):
     ----------
     api_key : str
         The loaded API key.
-    badPolygonCoords : list
-        A list of bad polygon coordinates to avoid.
-    mediumPolygonCoords : list
-        A list of medium polygon coordinates to avoid.
+    heatmapCoords : list
+        A list of polygons for the heatmap
+    safetyScores : list
+        A list with a single value between 0 and 1 for the safety of each polygon
     safePlaceCoords : list
-        A list of safe place coordinates.
+        A list of coordinates for safe places
 
     Methods:
     -------
@@ -35,9 +35,9 @@ class WebCrawler(Heatmap):
         Finds nearby safe places along a route.
     """
 
-    def __init__(self):
+    def __init__(self, data_dir):
         self.api_key = self.load_api_key()
-        super().__init__()
+        super().__init__(data_dir)
 
     def load_api_key(self):
         """
@@ -48,9 +48,6 @@ class WebCrawler(Heatmap):
         api_key : str or None
             The API key value if found, otherwise `None`.
         """
-
-        # Try to load environment variables from .env file in the current directory
-        load_dotenv()
 
         # Try to load environment variables from .env file in the current directory
         env_file_cwd = Path.cwd() / ".env"
@@ -74,8 +71,8 @@ class WebCrawler(Heatmap):
         waypoints,
         profile,
         optimize,
-        badPolygonCoords,
-        mediumPolygonCoords,
+        heatmap,
+        safetyScores
     ):
         """
         Makes a routing API call to GraphHopper.
@@ -92,10 +89,10 @@ class WebCrawler(Heatmap):
             The routing profile to use (e.g., "foot")
         optimize : str
             Whether to optimize the route (e.g., "false")
-        badPolygonCoords : list
-            A list of bad polygon coordinates to avoid
-        mediumPolygonCoords : list
-            A list of medium polygon coordinates to avoid
+        heatmap : list
+            A list of polygon coordinates to avoid
+        safetyScores : 
+            A safety score for every polygon in the heatmap
 
         RETURNS
         -------
@@ -144,26 +141,15 @@ class WebCrawler(Heatmap):
                     },
                 },
             }
-            # TODO: add a f-string in "multiply_by" so we can have different scores for every polygon
-            for i, polygon in enumerate(badPolygonCoords):
+
+            for i, polygon in enumerate(heatmap):
                 feature = {
                     "type": "Feature",
                     "id": f"bad{i}",
                     "properties": {},
                     "geometry": {"type": "Polygon", "coordinates": [polygon]},
                 }
-                priority = {"else_if": f"in_bad{i}", "multiply_by": "0.01"}
-                data["custom_model"]["areas"]["features"].append(feature)
-                data["custom_model"]["priority"].append(priority)
-
-            for i, polygon in enumerate(mediumPolygonCoords):
-                feature = {
-                    "type": "Feature",
-                    "id": f"medium{i}",
-                    "properties": {},
-                    "geometry": {"type": "Polygon", "coordinates": [polygon]},
-                }
-                priority = {"else_if": f"in_medium{i}", "multiply_by": "0.3"}
+                priority = {"else_if": f"in_bad{i}", "multiply_by": f"{safetyScores[i]}"}
                 data["custom_model"]["areas"]["features"].append(feature)
                 data["custom_model"]["priority"].append(priority)
 
@@ -202,8 +188,8 @@ class WebCrawler(Heatmap):
             [],
             profile,
             "false",
-            self.badPolygonCoords,
-            self.mediumPolygonCoords,
+            self.heatmapCoords,
+            self.safetyScores
         )
 
         # print(initial_route)
@@ -224,8 +210,8 @@ class WebCrawler(Heatmap):
                     waypoints,
                     profile,
                     "false",
-                    self.badPolygonCoords,
-                    self.mediumPolygonCoords,
+                    self.heatmapCoords,
+                    self.safetyScores
                 )
             else:
                 final_route = initial_route
