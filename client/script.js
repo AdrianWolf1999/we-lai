@@ -52,6 +52,7 @@ async function getHeatmapData() {
     }
 }
 
+// TODO: Why flipping multiple times (and creating flipped data), and not just flipping before api request
 // Function to flip the coordinates
 function flipCoordinates(coords) {
     return coords.map(polygon => polygon.map(([a, b]) => [b, a]));

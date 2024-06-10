@@ -1,85 +1,335 @@
-# TODO: Crawl 3 different routes at a time (for now there is only one)
-
 import os
 from pathlib import Path
 import requests
 from dotenv import load_dotenv
+from geopy.distance import geodesic
+from services.routing import Heatmap
 
 
-class WebCrawler:
-    '''
+class WebCrawler(Heatmap):
+    """
     Provides a method to crawl from Google API and return the requested route as json.
-    '''
+
+    Attributes:
+    ----------
+    api_key : str
+        The loaded API key.
+    badPolygonCoords : list
+        A list of bad polygon coordinates to avoid.
+    mediumPolygonCoords : list
+        A list of medium polygon coordinates to avoid.
+    safePlaceCoords : list
+        A list of safe place coordinates.
+
+    Methods:
+    -------
+    load_api_key() : str or None
+        Loads the API key from a .env file in the current directory.
+    api_routing_call(origin, destination, waypoints, profile, optimize, badPolygonCoords, mediumPolygonCoords) : dict
+        Makes a routing API call to GraphHopper with the specified origin, destination, waypoints, profile, and optimization settings.
+    get_route(origin, destination, profile) : dict
+        Crawls the route through GraphHopper's API and returns the route data as json.
+    is_within_distance(coord1, coord2, max_distance_km=0.5) : bool
+        Checks if two coordinates are within a certain distance of each other.
+    find_nearby_safe_places(route, max_distance_for_no_detour=0.1, max_distance_for_detour=0.2) : list
+        Finds nearby safe places along a route.
+    """
 
     def __init__(self):
-        pass
+        self.api_key = self.load_api_key()
+        super().__init__()
 
     def load_api_key(self):
-        '''
+        """
         Loads the API key from 'api_key.env' file in the current directory.
 
         RETURNS
         ----------
         api_key : str or None
             The API key value if found, otherwise `None`.
-        '''
-        load_dotenv()
+        """
+
         # Try to load environment variables from .env file in the current directory
-        env_file_cwd = Path.cwd() / '.env'
+        load_dotenv()
+
+        # Try to load environment variables from .env file in the current directory
+        env_file_cwd = Path.cwd() / ".env"
         if env_file_cwd.exists():
             # Load environment variables from .env file
             load_dotenv(env_file_cwd)
 
-        # Access the API key
-        api_key = os.getenv("API_KEY")
+        # Load the HERE API key from a file or environment variable
+        api_key = os.getenv("GEO_API_KEY")
         if api_key is None:
             print(
-                "Error: No API key found. Please create a .env file like stated in README")
+                "Error: No HERE API key found. Please create a .env file like stated in README"
+            )
+            return None
         return api_key
 
-    def get_route(self, origin, destination, api_key):
-        '''
-        Crawls the Route through Google's API and returns the route data as json.
+    def api_routing_call(
+        self,
+        origin,
+        destination,
+        waypoints,
+        profile,
+        optimize,
+        badPolygonCoords,
+        mediumPolygonCoords,
+    ):
+        """
+        Makes a routing API call to GraphHopper.
 
         PARAMETERS
         ----------
         origin : str
-            The starting location of the route (e.g., "New York, NY")
+            The starting location of the route (e.g., "48.783391,9.180221")
         destination : str
-            The ending location of the route (e.g., "Los Angeles, CA")
-        api_key : str
-            The API key for accessing the Google Maps API
+            The ending location of the route (e.g., "48.779477,9.179306")
+        waypoints : list
+            A list of waypoints to include in the route
+        profile : str
+            The routing profile to use (e.g., "foot")
+        optimize : str
+            Whether to optimize the route (e.g., "false")
+        badPolygonCoords : list
+            A list of bad polygon coordinates to avoid
+        mediumPolygonCoords : list
+            A list of medium polygon coordinates to avoid
 
         RETURNS
         -------
-        data : str
-            The route data as a JSON dictionary, or an error message if an exception occurs
-        '''
+        data : dict
+            The route data as a JSON dictionary, or an empty dictionary if an exception occurs
+        """
+        
         try:
-            # Construct the API endpoint URL
-            base_url = "https://maps.googleapis.com/maps/api/directions/json"
-            params = {
-                "origin": origin,
-                "destination": destination,
-                "key": api_key
+            url = "https://graphhopper.com/api/1/route"
+            headers = {"Content-Type": "application/json"}
+            params = {"key": self.api_key}
+            data = {
+                "profile": profile,
+                "points": [
+                    origin.split(","),  # Source coordinates
+                    *[wp.split(",") for wp in waypoints],  # waypoints
+                    destination.split(","),  # Target coordinates
+                ],
+                "ch.disable": True,
+                "points_encoded": False,
+                "optimize": optimize,
+                "custom_model": {
+                    "priority": [
+                        {"if": "in_init", "multiply_by": "1"},
+                    ],
+                    "areas": {
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "id": "init",
+                                "properties": {},
+                                "geometry": {
+                                    "type": "Polygon",
+                                    "coordinates": [
+                                        [
+                                            [9.179079392366791, 48.77928985002192],
+                                            [9.178403533981024, 48.77848548812847],
+                                            [9.180537608035477, 48.77835052681645],
+                                            [9.179079392366791, 48.77928985002192]
+                                        ]
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                },
             }
+            # TODO: add a f-string in "multiply_by" so we can have different scores for every polygon
+            for i, polygon in enumerate(badPolygonCoords):
+                feature = {
+                    "type": "Feature",
+                    "id": f"bad{i}",
+                    "properties": {},
+                    "geometry": {"type": "Polygon", "coordinates": [polygon]},
+                }
+                priority = {"else_if": f"in_bad{i}", "multiply_by": "0.01"}
+                data["custom_model"]["areas"]["features"].append(feature)
+                data["custom_model"]["priority"].append(priority)
 
-            # Send the API request
-            response = requests.get(base_url, params=params, timeout=10)
+            for i, polygon in enumerate(mediumPolygonCoords):
+                feature = {
+                    "type": "Feature",
+                    "id": f"medium{i}",
+                    "properties": {},
+                    "geometry": {"type": "Polygon", "coordinates": [polygon]},
+                }
+                priority = {"else_if": f"in_medium{i}", "multiply_by": "0.3"}
+                data["custom_model"]["areas"]["features"].append(feature)
+                data["custom_model"]["priority"].append(priority)
 
-            # Raise an HTTPError if the HTTP request returned an unsuccessful status code
+            response = requests.post(url, json=data, headers=headers, params=params)
             response.raise_for_status()
-
-            data = response.json()
-            return data
+            ret = response.json()
 
         except requests.exceptions.RequestException as e:
-            return f"Error: {e}"
+            print(f"An Exception occured: {e}")
+            ret = {}
+
+        return ret
+
+    def get_route(self, origin, destination, profile):
+        """
+        Crawls the Route through GraphHopper's API and returns the route data as json.
+
+        PARAMETERS
+        ----------
+        origin : str
+            The starting location of the route (e.g., "48.783391,9.180221")
+        destination : str
+            The ending location of the route (e.g., "48.779477,9.179306")
+        profile : str
+            The routing profile to use (e.g., "foot")
+
+        RETURNS
+        -------
+        data : dict
+            The route data as a JSON dictionary, or an error message if an exception occurs
+        """
+
+        initial_route = self.api_routing_call(
+            origin,
+            destination,
+            [],
+            profile,
+            "false",
+            self.badPolygonCoords,
+            self.mediumPolygonCoords,
+        )
+
+        # print(initial_route)
+
+        if "paths" in initial_route and initial_route["paths"]:
+            waypoints = self.find_nearby_safe_places(initial_route, 0.05, 0.1)
+
+            print("Waypoints:")
+            print(waypoints)
+            print("###########")
+
+            final_route = {}
+
+            if waypoints:
+                final_route = self.api_routing_call(
+                    origin,
+                    destination,
+                    waypoints,
+                    profile,
+                    "false",
+                    self.badPolygonCoords,
+                    self.mediumPolygonCoords,
+                )
+            else:
+                final_route = initial_route
+
+            return final_route
+
+# TODO: do you really need a function for this?
+    def is_within_distance(self, coord1, coord2, max_distance_km=0.5):
+        """
+        Checks if two coordinates are within a certain distance of each other.
+
+        PARAMETERS
+        ----------
+        coord1 : tuple
+            The first coordinate (e.g., (48.783391, 9.180221))
+        coord2 : tuple
+            The second coordinate (e.g., (48.779477, 9.179306))
+        max_distance_km : float
+            The maximum distance in kilometers (default: 0.5)
+
+        RETURNS
+        -------
+        bool
+            True if the coordinates are within the maximum distance, False otherwise
+        """
+        
+        return geodesic(coord1, coord2).km <= max_distance_km
+
+    def find_nearby_safe_places(
+        self, route, max_distance_for_no_detour=0.1, max_distance_for_detour=0.2
+    ):
+        """
+        Finds nearby safe places along a route.
+
+        PARAMETERS
+        ----------
+        route : dict
+            The route data as a JSON dictionary
+        max_distance_for_no_detour : float
+            The maximum distance for no detour in kilometers (default: 0.1)
+        max_distance_for_detour : float
+            The maximum distance for detour in kilometers (default: 0.2)
+
+        RETURNS
+        -------
+        list
+            A list of nearby safe places as strings (e.g., ["48.783391,9.180221", ...])
+        """
+
+        route = route["paths"][0]
+        total_distance = route["distance"]
+
+        waypoints = []
+
+        num_segments = len(route["points"]["coordinates"])
+        last_coordinate = route["points"]["coordinates"][0]
+        distance_since_last_checkpoint = 0
+        distance_since_start = 0
+        checkpoint_interval = 0.5
+        i = 0
+
+        while i < num_segments:
+            current_coordinate = route["points"]["coordinates"][i]
+            distance = geodesic(current_coordinate, last_coordinate).kilometers
+            distance_since_last_checkpoint = distance_since_last_checkpoint + distance
+            distance_since_start = distance_since_start + distance
+            last_coordinate = current_coordinate
+
+            more_than_250m_from_finish = (total_distance - distance_since_start) > 0.25
+            new_checkpoint_interval_reached = (
+                distance_since_last_checkpoint > checkpoint_interval
+                and more_than_250m_from_finish
+            )
+
+            if new_checkpoint_interval_reached:
+                for safe_place in self.safePlaceCoords:
+                    waypoint_already_close_enough = False
+                    if self.is_within_distance(
+                        current_coordinate, safe_place, max_distance_for_no_detour
+                    ):
+                        waypoint_already_close_enough = True
+                        break
+
+                if waypoint_already_close_enough:
+                    distance_since_last_checkpoint = 0
+                else:
+                    for safe_place in self.safePlaceCoords:
+                        if self.is_within_distance(
+                            current_coordinate, safe_place, max_distance_for_detour
+                        ):
+                            waypoints.append(f"{safe_place[0]},{safe_place[1]}")
+                            distance_since_last_checkpoint = 0
+                            break
+
+            i = i + 1
+        return list(set(waypoints))
 
 
 # just for testing:
 if __name__ == "__main__":
     crawler = WebCrawler()
     result = crawler.get_route(
-        "48.783391,9.180221", "48.779477,9.179306", crawler.load_api_key())
+        "48.783391,9.180221",
+        "48.779477,9.179306",
+        "foot",
+    )
     print(result)
