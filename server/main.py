@@ -1,3 +1,5 @@
+# TODO: Remove experiments and cache if not needed (or add to .gitignore and remove from repo)
+
 """
 Main application module.
 
@@ -25,6 +27,15 @@ Routes:
 /heatmap (GET)
     Returns the heatmap data, including bad polygon coordinates, medium polygon coordinates, and safe place coordinates.
 
+/add_polygon (POST)
+    Adds a new polygon to the heatmap with the specified safety score.
+
+/add_safe_place (POST)
+    Adds a new safe place to the heatmap with the specified coordinates.
+
+/suggestions (GET)
+    Returns a list of suggestions based on the specified query.
+
 Notes:
 -----
 This module is the entry point of the application.
@@ -46,11 +57,13 @@ crawler = WebCrawler(os.path.join(os.getcwd(), "server/data"))
 
 @app.route("/")
 def index():
+    print("New client on the map!")
     return send_from_directory(app.static_folder, "index.html")
 
 
 @app.route("/route", methods=["GET"])
 def get_safe_route():
+    print("Safe route requested and in calculation...")
     try:
         origin = request.args.get("origin")
         destination = request.args.get("destination")
@@ -67,6 +80,7 @@ def get_safe_route():
 
 @app.route("/heatmap", methods=["GET"])
 def get_heatmap_data():
+    print("Heatmap requested and sending to the client...")
     try:
         return jsonify(heatmap.get_heatmap_and_safe_places())
     except Exception as e:
@@ -76,6 +90,7 @@ def get_heatmap_data():
 
 @app.route("/add_polygon", methods=["POST"])
 def add_new_polygon():
+    print("New polygon added to map by client!")
     try:
         polygon = json.loads(request.args.get("polygon"))["coordinates"]
         safety_score = request.args.get("safetyScore")
@@ -89,6 +104,7 @@ def add_new_polygon():
 
 @app.route("/add_safe_place", methods=["POST"])
 def add_new_safe_place():
+    print("New safe place added to map by client!")
     try:
         coordinates_string_array = request.args.get("coordinates").split(",")
         coordinates = [float(coord) for coord in coordinates_string_array]
@@ -98,13 +114,15 @@ def add_new_safe_place():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": "Server Error: " + str(e)}), 400
-    
+
+
 @app.route("/suggestions", methods=["GET"])
 def get_suggestions():
+    print("Map suggestions requested and sending to the client...")
     try:
         query = request.args.get("query")
         d = crawler.get_suggestions(query)
-        print(d)
+        print(d)  # TODO: Still needed?
         return jsonify(d)
     except Exception as e:
         traceback.print_exc()

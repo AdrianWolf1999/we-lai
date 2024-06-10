@@ -5,36 +5,52 @@ import requests
 from dotenv import load_dotenv
 from geopy.distance import geodesic
 from services.heatmap import Heatmap
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
 
 
 class WebCrawler(Heatmap):
     """
+    WebCrawler class.
+
     Provides a method to crawl from Google API and return the requested route as json.
 
     Attributes:
     ----------
     api_key : str
         The loaded API key.
+
     heatmap_coords : list
         A list of polygons for the heatmap
+
     safety_scores : list
         A list with a single value between 0 and 1 for the safety of each polygon
+
     safe_place_coords : list
         A list of coordinates for safe places
 
     Methods:
-    -------
+    ----------
     load_api_key() : str or None
-        Loads the API key from a .env file in the current directory.
-    api_routing_call(origin, destination, waypoints, profile, optimize, badPolygonCoords, mediumPolygonCoords) : dict
+        Loads the API key from a.env file in the current directory.
+
+    api_routing_call(origin, destination, waypoints, profile, optimize, heatmap, safety_scores) : dict
         Makes a routing API call to GraphHopper with the specified origin, destination, waypoints, profile, and optimization settings.
+
     get_route(origin, destination, profile) : dict
         Crawls the route through GraphHopper's API and returns the route data as json.
+
     is_within_distance(coord1, coord2, max_distance_km=0.5) : bool
         Checks if two coordinates are within a certain distance of each other.
+
     find_nearby_safe_places(route, max_distance_for_no_detour=0.1, max_distance_for_detour=0.2) : list
         Finds nearby safe places along a route.
+
+    get_suggestions(query) : dict
+        Returns a list of suggestions based on the specified query.
+
+    Notes:
+    -----
+    This class is responsible for crawling route data from GraphHopper's API and finding nearby safe places.
     """
 
     def __init__(self, data_dir):
@@ -163,6 +179,23 @@ class WebCrawler(Heatmap):
         return ret
 
     def get_suggestions(self, query):
+        """
+        Returns a list of suggestions based on the specified query.
+
+        Parameters:
+        ----------
+        query : str
+            The search query for which suggestions are to be returned.
+
+        Returns:
+        ----------
+        dict
+            A dictionary containing a list of suggestions.
+
+        Notes:
+        -----
+        This method uses GraphHopper's API to fetch suggestions based on the query.
+        """
         try:
             url = "https://graphhopper.com/api/1/geocode"
             params = {"q": query, "key": self.api_key}
@@ -180,7 +213,7 @@ class WebCrawler(Heatmap):
         """
         Crawls the Route through GraphHopper's API and returns the route data as json.
 
-        PARAMETERS
+        Parameters:
         ----------
         origin : str
             The starting location of the route (e.g., "48.783391,9.180221")
@@ -189,10 +222,14 @@ class WebCrawler(Heatmap):
         profile : str
             The routing profile to use (e.g., "foot")
 
-        RETURNS
-        -------
+        Returns:
+        ----------
         data : dict
             The route data as a JSON dictionary, or an error message if an exception occurs
+
+        Notes:
+        -----
+        This method first makes an initial API call to get the route, then finds nearby safe places and adds them as waypoints to the route.
         """
 
         initial_route = self.api_routing_call(
@@ -205,17 +242,12 @@ class WebCrawler(Heatmap):
             self.safety_scores,
         )
 
-        # print(initial_route)
-
         if "paths" in initial_route and initial_route["paths"]:
             waypoints = self.find_nearby_safe_places(
                 origin, destination, profile, initial_route
             )
 
-            print("Waypoints:")
-            print(waypoints)
-            print("###########")
-
+            print("Waypoint added to route:", waypoints)
             final_route = {}
 
             if waypoints:
@@ -241,20 +273,32 @@ class WebCrawler(Heatmap):
         route,
         additional_percent=0.2,
         buffer_distance_km=0.5,
+        ignore_range_km=0.2,
     ):
         """
         Find nearby safe places along a route.
 
-        Args:
-        - origin (str): Starting point coordinates as a string (e.g., "48.783391,9.180221").
-        - destination (str): Destination coordinates as a string (e.g., "48.783391,9.180221").
-        - profile (str): Routing profile (e.g., "car", "bike", "foot").
-        - route (dict): Route data as a JSON object.
-        - additional_percent (float, optional): Allowed percentage increase in distance for detour (default: 0.2).
-        - buffer_distance_km (float, optional): Distance in kilometers to buffer around the route for preselecting safe places (default: 0.5).
+        Parameters:
+        ----------
+        origin : str
+            Starting point coordinates as a string (e.g., "48.783391,9.180221")
+        destination : str
+            Destination coordinates as a string (e.g., "48.783391,9.180221")
+        profile : str
+            Routing profile (e.g., "car", "bike", "foot")
+        route : dict
+            Route data as a JSON object
+        additional_percent : float, optional
+            Allowed percentage increase in distance for detour (default: 0.2)
+        buffer_distance_km : float, optional
+            Distance in kilometers to buffer around the route for preselecting safe places (default: 0.5)
+        ignore_range_km : float, optional
+            Distance in kilometers to ignore around the start and end points (default: 0.2)
 
         Returns:
-        - list: Nearby safe places as coordinate strings (e.g., ["48.783391,9.180221"]).
+        ----------
+        list
+            Nearby safe places as coordinate strings (e.g., ["48.783391,9.180221"])
         """
         # Extract route data
         route_data = route["paths"][0]
@@ -278,6 +322,18 @@ class WebCrawler(Heatmap):
         for safeplace in self.safe_place_coords:
             safeplace_point = Point(safeplace)
             if route_buffer.contains(safeplace_point):
+
+                # Check if the safe place is within the ignore range of start or end points
+                start_coords = tuple(map(float, origin.split(",")[::-1]))
+                end_coords = tuple(map(float, destination.split(",")[::-1]))
+                safeplace_coords = tuple(safeplace)[::-1]
+
+                if (
+                    geodesic(start_coords, safeplace_coords).km < ignore_range_km
+                    or geodesic(end_coords, safeplace_coords).km < ignore_range_km
+                ):
+                    continue  # skip this safe place if it's within the ignore range
+
                 safeplace_str = ",".join(map(str, safeplace))
                 route_with_safeplace = self.api_routing_call(
                     origin,
@@ -292,82 +348,87 @@ class WebCrawler(Heatmap):
                     route_with_safeplace["paths"][0]["distance"]
                     <= (1 + additional_percent) * total_distance
                 ):
-                    safeplace_distances.append(
-                        [route_with_safeplace["paths"][0]["distance"], safeplace]
-                    )
+                    # Calculate the heuristic value for this safe place
+                    heuristic_value = self.calculate_heuristic(route_with_safeplace)
+                    safeplace_distances.append([heuristic_value, safeplace])
 
         if not safeplace_distances:
             return []  # or some other default value indicating no safe places found
-        print(safeplace_distances)
+
         nearest_safeplace = min(safeplace_distances, key=lambda x: x[0])
         nearest_safeplace = ",".join(map(str, nearest_safeplace[1]))
         waypoints.append(nearest_safeplace)
         return waypoints
 
-    # TODO: Unused yet
-    def calculate_heuristic(
-        self, last_coordinate, current_coordinate, prev_segment, current_segment
-    ):
+    def calculate_heuristic(self, route):
         """
-        Calculate the additional distance to go over a checkpoint.
+        Calculate a heuristic value for a route based on its length and safety score.
 
         Args:
-        - last_coordinate (tuple): Last coordinate
-        - current_coordinate (tuple): Current coordinate
-        - prev_segment (dict): Previous route segment
-        - current_segment (dict): Current route segment
-
-        Returns:
-        - float: Additional distance to go over checkpoint in kilometers
-        """
-        # Calculate the distance from the last coordinate to the current coordinate
-        direct_distance = geodesic(last_coordinate, current_coordinate).km
-
-        # Calculate the distance from the last coordinate to the previous segment's end
-        # and then from the previous segment's end to the current coordinate
-        detour_distance = geodesic(
-            last_coordinate, (prev_segment[1], prev_segment[0])
-        ).km
-        detour_distance += geodesic(
-            (prev_segment[1], prev_segment[0]), current_coordinate
-        ).km
-
-        # Return the additional distance to go over the checkpoint
-        return detour_distance - direct_distance
-
-    # TODO: Unused yet
-    def calculate_heuristic3(self, safe_place, route_data):
-        """
-        Calculate the heuristic value for a safe place.
-
-        Args:
-        - safe_place (tuple): Safe place coordinates
-        - route (dict): Route data as a JSON object
+        - route_data (dict): Route data as a JSON object
 
         Returns:
         - float: Heuristic value
         """
-        # Calculate the heuristic value based on the distance from the safe place to the route
-        # and other factors (e.g., safety score, distance to destination)
-        # For simplicity, let's use a simple distance-based heuristic
-        min_distance_to_route = float("inf")
+
+        route_data = route["paths"][0]
+
+        # Calculate the total distance of the route
+        total_distance = route_data["distance"]
+
+        # Initialize the badness score
+        badness_score = 0
+
+        # Iterate over the route segments
         for i in range(len(route_data["points"]["coordinates"]) - 1):
             segment_start = route_data["points"]["coordinates"][i]
             segment_end = route_data["points"]["coordinates"][i + 1]
-            distance_to_segment = self.distance_to_segment(
-                safe_place, segment_start, segment_end
-            )
-            if distance_to_segment < min_distance_to_route:
-                min_distance_to_route = distance_to_segment
-        return min_distance_to_route
 
+            # Check if the segment passes through any polygon areas with low safety scores
+            for polygon, safety_score in zip(self.heatmap_coords, self.safety_scores):
+                if self.is_segment_in_polygon(segment_start, segment_end, polygon):
+                    badness_score += (1 - safety_score) * self.segment_length(
+                        segment_start, segment_end
+                    )
 
-# just for testing:
-if __name__ == "__main__":
-    crawler = WebCrawler("")
-    result = crawler.get_route(
-        "48.783391,9.180221",
-        "48.779477,9.179306",
-        "foot",
-    )
-    print(result)
+        # Calculate the heuristic value as a weighted sum of the total distance and badness score
+        heuristic_value = total_distance + badness_score
+        # maybe add a weight value =! 1 for badness_score
+
+        return heuristic_value
+
+    def is_segment_in_polygon(self, segment_start, segment_end, polygon):
+        """
+        Check if a segment is inside a polygon.
+
+        Args:
+        - segment_start (list of long and lat): Start point of the segment
+        - segment_end (list of long and lat): End point of the segment
+        - polygon (list): Polygon coordinates
+
+        Returns:
+        - bool: True if the segment is inside the polygon, False otherwise
+        """
+
+        # Create a LineString object from the segment
+        line = LineString([segment_start, segment_end])
+
+        # Create a Polygon object from the polygon coordinates
+        poly = Polygon(polygon)
+
+        # Check if the LineString intersects with the Polygon
+        return poly.intersects(line)
+
+    def segment_length(self, segment_start, segment_end):
+        """
+        Calculate the length of a segment.
+
+        Args:
+        - segment_start (tuple): Start point of the segment
+        - segment_end (tuple): End point of the segment
+
+        Returns:
+        - float: Length of the segment
+        """
+        # Calculate the distance between the two points using the geodesic distance
+        return geodesic(segment_start, segment_end).km
