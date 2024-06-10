@@ -30,10 +30,11 @@ Notes:
 This module is the entry point of the application.
 """
 
-import os
 import json
+import os
 import traceback
-from flask import Flask, request, jsonify, send_from_directory
+
+from flask import Flask, jsonify, request, send_from_directory
 from services.heatmap import Heatmap
 from services.webcrawler import WebCrawler
 
