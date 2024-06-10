@@ -65,14 +65,7 @@ class WebCrawler(Heatmap):
         return api_key
 
     def api_routing_call(
-        self,
-        origin,
-        destination,
-        waypoints,
-        profile,
-        optimize,
-        heatmap,
-        safety_scores
+        self, origin, destination, waypoints, profile, optimize, heatmap, safety_scores
     ):
         """
         Makes a routing API call to GraphHopper.
@@ -91,7 +84,7 @@ class WebCrawler(Heatmap):
             Whether to optimize the route (e.g., "false")
         heatmap : list
             A list of polygon coordinates to avoid
-        safety_scores : 
+        safety_scores :
             A safety score for every polygon in the heatmap
 
         RETURNS
@@ -99,7 +92,7 @@ class WebCrawler(Heatmap):
         data : dict
             The route data as a JSON dictionary, or an empty dictionary if an exception occurs
         """
-        
+
         try:
             url = "https://graphhopper.com/api/1/route"
             headers = {"Content-Type": "application/json"}
@@ -132,7 +125,7 @@ class WebCrawler(Heatmap):
                                             [9.179079392366791, 48.77928985002192],
                                             [9.178403533981024, 48.77848548812847],
                                             [9.180537608035477, 48.77835052681645],
-                                            [9.179079392366791, 48.77928985002192]
+                                            [9.179079392366791, 48.77928985002192],
                                         ]
                                     ],
                                 },
@@ -149,7 +142,10 @@ class WebCrawler(Heatmap):
                     "properties": {},
                     "geometry": {"type": "Polygon", "coordinates": [polygon]},
                 }
-                priority = {"else_if": f"in_bad{i}", "multiply_by": f"{safety_scores[i]}"}
+                priority = {
+                    "else_if": f"in_bad{i}",
+                    "multiply_by": f"{safety_scores[i]}",
+                }
                 data["custom_model"]["areas"]["features"].append(feature)
                 data["custom_model"]["priority"].append(priority)
 
@@ -189,7 +185,7 @@ class WebCrawler(Heatmap):
             profile,
             "false",
             self.heatmap_coords,
-            self.safety_scores
+            self.safety_scores,
         )
 
         # print(initial_route)
@@ -211,14 +207,14 @@ class WebCrawler(Heatmap):
                     profile,
                     "false",
                     self.heatmap_coords,
-                    self.safety_scores
+                    self.safety_scores,
                 )
             else:
                 final_route = initial_route
 
             return final_route
 
-# TODO: do you really need a function for this?
+    # TODO: do you really need a function for this?
     def is_within_distance(self, coord1, coord2, max_distance_km=0.5):
         """
         Checks if two coordinates are within a certain distance of each other.
@@ -237,7 +233,7 @@ class WebCrawler(Heatmap):
         bool
             True if the coordinates are within the maximum distance, False otherwise
         """
-        
+
         return geodesic(coord1, coord2).km <= max_distance_km
 
     def find_nearby_safe_places(
@@ -287,8 +283,8 @@ class WebCrawler(Heatmap):
             )
 
             if new_checkpoint_interval_reached:
+                waypoint_already_close_enough = False
                 for safe_place in self.safe_place_coords:
-                    waypoint_already_close_enough = False
                     if self.is_within_distance(
                         current_coordinate, safe_place, max_distance_for_no_detour
                     ):

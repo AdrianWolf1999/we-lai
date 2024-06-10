@@ -20,9 +20,10 @@
     </div>
 
     <div id="radioButtonContainer">
-        <label><input type="radio" id="defaultRadioButton" name="mode" value="default" checked> Default</label>
-        <label><input type="radio" id="polygonRadioButton" name="mode" value="add_polygon"> Add Polygon</label>
-        <label><input type="radio" id="safePlaceRadioButton" name="mode" value="add_safe_place"> Add Safe Place</label>
+        <input type="text" id="safetyScoreInput" placeholder="Safety Score">
+        <label id="defaultRadioButtonLabel"><input type="radio" id="defaultRadioButton" name="mode" value="default" checked> Default</label>
+        <label id="polygonRadioButtonLabel" ><input type="radio" id="polygonRadioButton" name="mode" value="add_polygon"> Add Polygon</label>
+        <label id="safePlaceRadioButtonLabel" ><input type="radio" id="safePlaceRadioButton" name="mode" value="add_safe_place"> Add Safe Place</label>
     </div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>

@@ -5,6 +5,12 @@ const toggleMetaButtonElement = document.getElementById('toggleMetaButton');
 const defaultRadioButtonElement = document.getElementById('defaultRadioButton');
 const polygonRadioButtonElement = document.getElementById('polygonRadioButton');
 const safePlaceRadioButtonElement = document.getElementById('safePlaceRadioButton');
+const safetyScoreInputElement = document.getElementById('safetyScoreInput');
+const defaultRadioButtonLabelElement = document.getElementById('defaultRadioButtonLabel');
+const polygonRadioButtonLabelElement = document.getElementById('polygonRadioButtonLabel');
+const safePlaceRadioButtonLabelElement = document.getElementById('safePlaceRadioButtonLabel');
+
+const apiKey = "";
     
 const map = L.map('mapContainer').setView([52.5, 13.4], 16);
 
@@ -27,6 +33,15 @@ let editMode = 'default'
 let editPolygonCoords = []
 let editSafePlaceCoords = []
 
+
+
+
+
+
+// HEATMAP FUNCTIONS
+//--------------------------------------------------------------------------------------------------
+
+// Calls the server to get the heatmap data
 async function getHeatmapData() {
 	try {
         // Construct the URL with query parameters
@@ -40,6 +55,11 @@ async function getHeatmapData() {
         });
 
         const heatmapData = await response.json();
+
+        if (heatmapData['error'] != undefined) {
+            console.error(heatmapData['error']);
+            return;
+        }
 		
 		heatmapPolygonCoords = heatmapData.heatmap.coordinates;
 		safetyScores = heatmapData.heatmap.safetyScores;
@@ -51,21 +71,36 @@ async function getHeatmapData() {
     }
 }
 
+// Convert a value to a color. Should be between 0 and 1
 function valueToColor(value) {
     value = Math.max(0, Math.min(1, value));
     var hue = value * 60;
     return `hsl(${hue}, 100%, 50%)`;
 }
+
+// Adds heatmap elements to the map
 function createHeatmap() {
+    for (let i in heatmapPolygons) {
+        map.removeLayer(heatmapPolygons[i]);
+    }
+    for (let i in safePlaces) {
+        map.removeLayer(safePlaces[i]);
+    }
+
+    heatmapPolygons = [];
+    safePlaces = [];
+    metaShown = true;
+
     for (let i in heatmapPolygonCoords) {
         heatmapPolygons.push(L.polygon(heatmapPolygonCoords[i], { color: valueToColor(safetyScores[i]), fillOpacity: 0.3, weight: 0 }).addTo(map));
     }
 
     for (let i in safePlaceCoords) {
-        safePlaces.push(L.circle(safePlaceCoords[i], {color: 'green', fillColor: 'green', fillOpacity: 0.5, weight: 0, radius: 40}).addTo(map));
+        safePlaces.push(L.circle(safePlaceCoords[i], {color: '#00ff26', fillColor: '#00ff26', fillOpacity: 0.5, weight: 0, radius: 30}).addTo(map));
     }
 }
 
+// Enables/Disables the heatmap elements
 function toggleHeatmap() {
 	metaShown = !metaShown;
 
@@ -86,16 +121,15 @@ function toggleHeatmap() {
 	}
 }
 
-searchInputElement.addEventListener('input', () => {
-    const query = searchInputElement.value;
-    if (query.length >= 3) {
-        getSuggestions(query);
-    } else {
-        suggestionsElement.style.display = 'none';
-    }
-});
 
 
+
+
+
+// LOCATION SEARCH FUNCTIONS
+//--------------------------------------------------------------------------------------------------
+
+// Gets location suggestions from graphhopper for the search string
 function getSuggestions(query) {
     fetch(`https://graphhopper.com/api/1/geocode?q=${query}&key=${apiKey}`)
         .then(response => response.json())
@@ -121,6 +155,7 @@ function getSuggestions(query) {
         });
 }
 
+// Sets the input field to the selected location and updates the target coordinates
 function selectLocation(lat, lng, label) {
     const coordinates = L.latLng(lat, lng);
 
@@ -130,6 +165,13 @@ function selectLocation(lat, lng, label) {
     onTargetChanged(coordinates);
 }
 
+
+
+
+// TARGET MARKER FUNCTIONS
+//--------------------------------------------------------------------------------------------------
+
+// Shows/moves the marker for the target coordinates
 function showTargetMarker(coordinates) {
 	const redIcon = L.icon({
         iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
@@ -146,22 +188,35 @@ function showTargetMarker(coordinates) {
     }
 }
 
+// Shows my current position
 function showMyMarker() {
     if (!myMarker) {
         myMarker = L.marker(myCoordinates).addTo(map);
     }
 }
 
+// Update map view if target marker changed its position
 function onTargetChanged(coordinates) {
 	removeRoutes();
     showTargetMarker(coordinates);
 	changeMapView(coordinates);
 }
 
+
+
+// MAP VIEW FUNCTIONS
+//--------------------------------------------------------------------------------------------------
+
+// Move view on map
 function changeMapView(coordinates) {
     map.setView(coordinates, map.getZoom());
 }
 
+
+// ROUTING DISPLAY FUNCTIONS
+//--------------------------------------------------------------------------------------------------
+
+// Show routes on map
 function displayRoutes(routesData) {
     if (!routesData) { return; }
 
@@ -194,6 +249,7 @@ function displayRoutes(routesData) {
 	map.fitBounds(routes[routes.length - 1].getBounds());
 }
 
+// Remove routes from map
 function removeRoutes() {
 	if (routes) {
 		for (let i in routes) {
@@ -203,31 +259,61 @@ function removeRoutes() {
 	routes = [];
 }
 
-// Function to handle right-click event and set target marker
-function addTargetMarker(e) {
-    const coordinates = e.latlng;
-    onTargetChanged(coordinates);
+
+
+// RIGHT-CLICK HELPER FUNCTIONS
+//--------------------------------------------------------------------------------------------------
+
+// Handles right-click event
+function onRightClick(e) {
+    switch (editMode) {
+        case 'default':
+            onTargetChanged(e.latlng);
+            break;
+        case 'polygon':
+            editPolygonCoords.push([e.latlng.lng, e.latlng.lat]);
+            break;
+        case 'safePlace':
+            editSafePlaceCoords = [e.latlng.lng, e.latlng.lat];
+            break;
+        default:
+            break;
+    }
 }
 
-// Add event listener for right-click event on the map
-map.on('contextmenu', addTargetMarker);
 
-toggleMetaButtonElement.addEventListener('click', () => {
-	toggleHeatmap();
-});
+// SERVER ROUTING AND HEATMAP UPDATE CALL FUNCTIONS
+//--------------------------------------------------------------------------------------------------
 
-bringMeHomeButtonElement.addEventListener('click', async() => {
+// Handles the press of the bringMeHome-button (routing / adding polygons / adding safe places)
+function onBringMeHomeButtonPressed() {
+    switch (editMode) {
+        case 'default':
+            requestRouteFromServer();
+            break;
+        case 'polygon':
+            sendSetPolygonToServer();
+            break;
+        case 'safePlace':
+            sendSetSafePlaceToServer();
+            break;
+        default:
+            break;
+    }
+}
+
+async function requestRouteFromServer() {
     if (!targetMarker || !myMarker) { return; }
 
-	const origin = `${myCoordinates.lng},${myCoordinates.lat}`;
-	const destination =  `${targetMarker.getLatLng().lng},${targetMarker.getLatLng().lat}`;
-	
-	try {
+    const origin = `${myCoordinates.lng},${myCoordinates.lat}`;
+    const destination =  `${targetMarker.getLatLng().lng},${targetMarker.getLatLng().lat}`;
+    
+    try {
         // Construct the URL with query parameters
         const url = new URL('/route', window.location.origin);
         url.searchParams.append('origin', origin);
         url.searchParams.append('destination', destination);
-		url.searchParams.append('profile', profile);
+        url.searchParams.append('profile', profile);
 
         const response = await fetch(url, {
             method: 'GET',
@@ -237,36 +323,163 @@ bringMeHomeButtonElement.addEventListener('click', async() => {
         });
 
         const routeData = await response.json();
-		console.log(routeData);
 
-		if (routeData['paths'] != undefined) {
-			displayRoutes(routeData['paths']);
-		}
+        if (routeData['error'] != undefined) {
+            console.error(routeData['error']);
+            return;
+        }
+
+        if (routeData['paths'] != undefined) {
+            displayRoutes(routeData['paths']);
+        }
     } catch (error) {
         console.error(error);
     }
+}
+
+async function sendSetPolygonToServer() {
+    if (editPolygonCoords.length === 0) return;
+
+    let input = safetyScoreInputElement.value;
+    let safetyScore = 0;
+    if (input) {
+        safetyScore = parseFloat(input);
+    }
+    try {
+        // Construct the URL with query parameters
+        const url = new URL('/add_polygon', window.location.origin);
+        url.searchParams.append('polygon', JSON.stringify({"coordinates": editPolygonCoords}));
+        url.searchParams.append('safetyScore', safetyScore);
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const heatmapData = await response.json();
+
+        if (heatmapData['error'] != undefined) {
+            console.error(heatmapData['error']);
+            return;
+        }
+
+        heatmapPolygonCoords = heatmapData.heatmap.coordinates;
+        safetyScores = heatmapData.heatmap.safetyScores;
+        safePlaceCoords = heatmapData.safePlaces.coordinates;
+
+        createHeatmap();
+
+        editPolygonCoords = [];
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function sendSetSafePlaceToServer() {
+    if (editSafePlaceCoords.length === 0) return;
+
+    try {
+        // Construct the URL with query parameters
+        const url = new URL('/add_safe_place', window.location.origin);
+        url.searchParams.append('coordinates', editSafePlaceCoords);
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const heatmapData = await response.json();
+
+        if (heatmapData['error'] != undefined) {
+            console.error(heatmapData['error']);
+            return;
+        }
+
+        heatmapPolygonCoords = heatmapData.heatmap.coordinates;
+        safetyScores = heatmapData.heatmap.safetyScores;
+        safePlaceCoords = heatmapData.safePlaces.coordinates;
+
+        createHeatmap();
+
+        editSafePlaceCoords = [];
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+
+// EVENT LISTENERS
+//--------------------------------------------------------------------------------------------------
+
+// Right-click event on the map
+map.on('contextmenu', onRightClick);
+
+// Toggle heatmap
+toggleMetaButtonElement.addEventListener('click', () => {
+	toggleHeatmap();
 });
 
-defaultRadioButtonElement.addEventListener("change", function(event) {
-    if (event.target.value) {
-        editMode = 'default';
-        bringMeHomeButtonElement.textContent = "Bring Me Home";
+// Search input
+searchInputElement.addEventListener('input', () => {
+    const query = searchInputElement.value;
+    if (query.length >= 3) {
+        getSuggestions(query);
+    } else {
+        suggestionsElement.style.display = 'none';
     }
 });
 
+// Bring me home button
+bringMeHomeButtonElement.addEventListener('click', () => {onBringMeHomeButtonPressed()});
+
+// Radio button default
+defaultRadioButtonElement.addEventListener("change", function(event) {
+    if (event.target.value) {
+        safePlaceRadioButtonLabelElement.style.backgroundColor = "#676666";
+        polygonRadioButtonLabelElement.style.backgroundColor = "#676666";
+        defaultRadioButtonLabelElement.style.backgroundColor = "#2c19f4";
+        editMode = 'default';
+        bringMeHomeButtonElement.textContent = "Bring Me Home";
+        safetyScoreInputElement.style.display = 'none';
+        editPolygonCoords = [];
+        editSafePlaceCoords = [];
+    }
+});
+
+// Radio button add polygon
 polygonRadioButtonElement.addEventListener("change", function(event) {
     if (event.target.value) {
+        safePlaceRadioButtonLabelElement.style.backgroundColor = "#676666";
+        polygonRadioButtonLabelElement.style.backgroundColor = "#2c19f4";
+        defaultRadioButtonLabelElement.style.backgroundColor = "#676666";
         editMode = 'polygon';
         bringMeHomeButtonElement.textContent = "Add Polygon";
+        safetyScoreInputElement.style.display = 'block';
+        editPolygonCoords = [];
+        editSafePlaceCoords = [];
     }    
 });
 
+// Radio button add safe place
 safePlaceRadioButtonElement.addEventListener("change", function(event) {
     if (event.target.value) {
+        safePlaceRadioButtonLabelElement.style.backgroundColor = "#2c19f4";
+        polygonRadioButtonLabelElement.style.backgroundColor = "#676666";
+        defaultRadioButtonLabelElement.style.backgroundColor = "#676666";
         editMode = 'safePlace';
         bringMeHomeButtonElement.textContent = "Add Safe Place";
+        safetyScoreInputElement.style.display = 'none';
+        editPolygonCoords = [];
+        editSafePlaceCoords = [];
     }
 });
+
+
+
 
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     attribution: '© OpenStreetMap contributors'

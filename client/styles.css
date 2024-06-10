@@ -28,7 +28,8 @@ html, body {
     position: relative;
 }
 
-#searchInput {
+#searchInput,
+#safetyScoreInput {
     padding: 10px;
     border: none;
     border-bottom: 2px solid #ccc;
@@ -37,7 +38,12 @@ html, body {
     width: 100%;
 }
 
-#searchInput:focus {
+#safetyScoreInput {
+    display: none
+}
+
+#searchInput:focus,
+#safetyScoreInput:focus {
     outline: none;
     border-bottom: 2px solid #666;
 }
@@ -100,8 +106,6 @@ html, body {
 #bringMeHomeButton:hover {
     background-color: #666;
 }
-
-
 #radioButtonContainer {
     position: absolute;
     bottom: 10px;
@@ -112,11 +116,33 @@ html, body {
     margin-left: auto; /* Push to the left */
     z-index: 1001; /* Ensure the radio buttons appear above other elements */
     font-family: Arial, sans-serif; /* Change the font-family to match the buttons */
+    background-color: transparent; /* Set background color to transparent */
 }
 
 #radioButtonContainer label {
     margin-bottom: 10px; /* Add spacing between radio buttons */
     font-size: 16px;
-    color: #333;
+    color: white;
     font-family: Arial, sans-serif; /* Change the font-family to match the buttons */
+    display: inline-block; /* Display as inline-block to control width and height */
+    padding: 8px 12px; /* Add padding to create rectangular shape */
+    border: 1px solid #999; /* Add border for button-like appearance */
+    border-radius: 4px; /* Add border radius for rounded corners */
+    cursor: pointer; /* Change cursor to pointer on hover */
+}
+
+#defaultRadioButtonLabel {
+    background-color: #2c19f4;
+}
+
+#polygonRadioButtonLabel {
+    background-color: #676666;
+}
+
+#safePlaceRadioButtonLabel {
+    background-color: #666766;
+}
+
+#radioButtonContainer input[type="radio"] {
+    display: none; /* Hide the radio button */
 }

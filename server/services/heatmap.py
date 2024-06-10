@@ -1,17 +1,18 @@
 import csv
 import os
 
+
 class Heatmap:
     """
     Represents a heatmap of crime data.
 
-	Attributes:
+        Attributes:
     ----------
     heatmap_coords : list
         List of bad polygon coordinates.
     safe_place_coords : list
         List of safe place coordinates.
-    
+
     Methods:
     -------
     __init__() : None
@@ -22,26 +23,29 @@ class Heatmap:
 
     def __init__(self, data_dir):
         self.data_dir = data_dir
-        self.heatmap_coords_path = os.path.join(data_dir, 'heatmap_coords.csv')
-        self.safety_scores_path = os.path.join(data_dir, 'safety_scores.csv')
-        self.safe_place_coords_path = os.path.join(data_dir, 'safe_place_coords.csv')
+        self.heatmap_coords_path = os.path.join(data_dir, "heatmap_coords.csv")
+        self.safety_scores_path = os.path.join(data_dir, "safety_scores.csv")
+        self.safe_place_coords_path = os.path.join(data_dir, "safe_place_coords.csv")
         self.heatmap_coords = []
         self.safety_scores = []
         self.safe_place_coords = []
         self.load_data_from_csv()
 
     def add_and_save_new_polygon(self, polygon, safety_score):
+        polygon.append(
+            polygon[0]
+        )  # Add first element to polygons end because routing call  expects closed loops
         self.heatmap_coords.append(polygon)
         self.safety_scores.append(safety_score)
         self.save_data_to_csv()
-    
+
     def add_and_save_new_safe_place(self, coordinates):
         self.safe_place_coords.append(coordinates)
         self.save_data_to_csv()
 
     def save_data_to_csv(self):
         # Save heatmap_coords
-        with open(self.heatmap_coords_path, mode='w', newline='') as file:
+        with open(self.heatmap_coords_path, mode="w", newline="") as file:
             writer = csv.writer(file)
             for polygon in self.heatmap_coords:
                 for coord in polygon:
@@ -49,20 +53,23 @@ class Heatmap:
                 writer.writerow([])  # Empty row to separate polygons
 
         # Save safety_scores
-        with open(self.safety_scores_path, mode='w', newline='') as file:
+        with open(self.safety_scores_path, mode="w", newline="") as file:
             writer = csv.writer(file)
             for score in self.safety_scores:
                 writer.writerow([score])
 
         # Save safe_place_coords
-        with open(self.safe_place_coords_path, mode='w', newline='') as file:
+        with open(self.safe_place_coords_path, mode="w", newline="") as file:
             writer = csv.writer(file)
             for coord in self.safe_place_coords:
                 writer.writerow(coord)
 
     def load_data_from_csv(self):
+        self.heatmap_coords = []
+        self.safe_place_coords = []
+        self.safety_scores = []
         # Load heatmap_coords
-        with open(self.heatmap_coords_path, mode='r') as file:
+        with open(self.heatmap_coords_path, mode="r") as file:
             reader = csv.reader(file)
             polygon = []
             for row in reader:
@@ -73,13 +80,13 @@ class Heatmap:
                     polygon = []
 
         # Load safety_scores
-        with open(self.safety_scores_path, mode='r') as file:
+        with open(self.safety_scores_path, mode="r") as file:
             reader = csv.reader(file)
             for row in reader:
                 self.safety_scores.append(float(row[0]))
 
         # Load safe_place_coords
-        with open(self.safe_place_coords_path, mode='r') as file:
+        with open(self.safe_place_coords_path, mode="r") as file:
             reader = csv.reader(file)
             for row in reader:
                 self.safe_place_coords.append([float(row[0]), float(row[1])])
@@ -87,6 +94,8 @@ class Heatmap:
     def flip_coordinates(self, coordinates):
         flipped_coords = []
         for coord_set in coordinates:
+            if not coord_set:
+                continue
             if isinstance(coord_set[0], list):  # Check if it's a nested list
                 flipped_set = [[b, a] for a, b in coord_set]
                 flipped_coords.append(flipped_set)
@@ -103,6 +112,6 @@ class Heatmap:
             },
             "safePlaces": {
                 "coordinates": self.flip_coordinates(self.safe_place_coords)
-            }
+            },
         }
         return data
