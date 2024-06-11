@@ -24,6 +24,9 @@ class WebCrawler(Heatmap):
 
     safety_scores : list
         A list with a single value between 0 and 1 for the safety of each polygon
+    
+    preferred_coords : list
+        A list with polygons of prefferred roads
 
     safe_place_coords : list
         A list of coordinates for safe places
@@ -33,7 +36,7 @@ class WebCrawler(Heatmap):
     load_api_key() : str or None
         Loads the API key from a.env file in the current directory.
 
-    api_routing_call(origin, destination, waypoints, profile, optimize, heatmap, safety_scores) : dict
+    api_routing_call(origin, destination, waypoints, profile, optimize, heatmap, safety_scores, preferred_coords) : dict
         Makes a routing API call to GraphHopper with the specified origin, destination, waypoints, profile, and optimization settings.
 
     get_route(origin, destination, profile) : dict
@@ -83,7 +86,7 @@ class WebCrawler(Heatmap):
         return api_key
 
     def api_routing_call(
-        self, origin, destination, waypoints, profile, optimize, heatmap, safety_scores
+        self, origin, destination, waypoints, profile, optimize, heatmap, safety_scores, preferred_coords
     ):
         """
         Makes a routing API call to GraphHopper.
@@ -152,6 +155,7 @@ class WebCrawler(Heatmap):
                 },
             }
 
+            # Add polygons with lower priority to api call
             for i, polygon in enumerate(heatmap):
                 feature = {
                     "type": "Feature",
@@ -165,7 +169,22 @@ class WebCrawler(Heatmap):
                 }
                 data["custom_model"]["areas"]["features"].append(feature)
                 data["custom_model"]["priority"].append(priority)
+            
+            # Add polygons with higher priority (but no loop this time as this is an inverse operation (it sets the priority of everythin else lower))
+            feature = {
+                "type": "Feature",
+                "id": "good",
+                "properties": {},
+                "geometry": {"type": "Polygon", "coordinates": preferred_coords},
+            }
+            priority = {
+                "if": "!in_good",
+                "multiply_by": "0.5",
+            }
+            data["custom_model"]["areas"]["features"].append(feature)
+            data["custom_model"]["priority"].append(priority)
 
+            # Post request
             response = requests.post(
                 url, json=data, headers=headers, params=params, timeout=10
             )
@@ -240,6 +259,7 @@ class WebCrawler(Heatmap):
             "false",
             self.heatmap_coords,
             self.safety_scores,
+            self.preferred_coords,
         )
 
         if "paths" in initial_route and initial_route["paths"]:
@@ -259,6 +279,7 @@ class WebCrawler(Heatmap):
                     "false",
                     self.heatmap_coords,
                     self.safety_scores,
+                    self.preferred_coords,
                 )
             else:
                 final_route = initial_route
@@ -343,6 +364,7 @@ class WebCrawler(Heatmap):
                     "false",
                     self.heatmap_coords,
                     self.safety_scores,
+                    self.preferred_coords,
                 )
                 if (
                     route_with_safeplace["paths"][0]["distance"]

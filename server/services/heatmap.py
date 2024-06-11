@@ -52,9 +52,11 @@ class Heatmap:
         self.heatmap_coords_path = os.path.join(data_dir, "heatmap_coords.csv")
         self.safety_scores_path = os.path.join(data_dir, "safety_scores.csv")
         self.safe_place_coords_path = os.path.join(data_dir, "safe_place_coords.csv")
+        self.preferred_coords_path = os.path.join(data_dir, "preferred_coords.csv")
         self.heatmap_coords = []
         self.safety_scores = []
         self.safe_place_coords = []
+        self.preferred_coords = []
         self.load_data_from_csv()
 
     def add_and_save_new_polygon(self, polygon, safety_score):
@@ -68,11 +70,20 @@ class Heatmap:
         safety_score : float
             The safety score associated with the polygon.
         """
-        polygon.append(
-            polygon[0]
-        )  # Add first element to polygons end because routing call  expects closed loops
-        self.heatmap_coords.append(polygon)
-        self.safety_scores.append(safety_score)
+        if isinstance(safety_score, str):
+            safety_score = float(safety_score)
+            
+        if safety_score > 1: # Higher priority areas
+            polygon.append(
+                polygon[0]
+            )  # Add first element to polygons end because routing call  expects closed loops
+            self.preferred_coords.append(polygon)
+        else: # Lower priority areas
+            polygon.append(
+                polygon[0]
+            )  # Add first element to polygons end because routing call  expects closed loops
+            self.heatmap_coords.append(polygon)
+            self.safety_scores.append(safety_score)
         self.save_data_to_csv()
 
     def add_and_save_new_safe_place(self, coordinates):
@@ -116,6 +127,16 @@ class Heatmap:
             writer = csv.writer(file)
             for coord in self.safe_place_coords:
                 writer.writerow(coord)
+        
+        # Save preferred_coords
+        with open(
+            self.preferred_coords_path, mode="w", newline="", encoding="utf-8"
+        ) as file:
+            writer = csv.writer(file)
+            for polygon in self.preferred_coords:
+                for coord in polygon:
+                    writer.writerow(coord)
+                writer.writerow([])  # Empty row to separate polygons
 
     def load_data_from_csv(self):
         """
@@ -124,6 +145,7 @@ class Heatmap:
         self.heatmap_coords = []
         self.safe_place_coords = []
         self.safety_scores = []
+        self.preferred_coords = []
         # Load heatmap_coords
         with open(self.heatmap_coords_path, mode="r", encoding="utf-8") as file:
             reader = csv.reader(file)
@@ -146,6 +168,18 @@ class Heatmap:
             reader = csv.reader(file)
             for row in reader:
                 self.safe_place_coords.append([float(row[0]), float(row[1])])
+
+        # Load heatmap_coords
+        with open(self.preferred_coords_path, mode="r", encoding="utf-8") as file:
+            reader = csv.reader(file)
+            polygon = []
+            for row in reader:
+                if row:
+                    polygon.append([float(row[0]), float(row[1])])
+                else:
+                    self.preferred_coords.append(polygon)
+                    polygon = []
+
 
     def flip_coordinates(self, coordinates):
         """
@@ -190,5 +224,8 @@ class Heatmap:
             "safePlaces": {
                 "coordinates": self.flip_coordinates(self.safe_place_coords)
             },
+            "preferred": {
+                "coordinates": self.flip_coordinates(self.preferred_coords)
+            }
         }
         return data

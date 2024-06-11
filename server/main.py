@@ -1,5 +1,3 @@
-# TODO: Remove experiments and cache if not needed (or add to .gitignore and remove from repo)
-
 """
 Main application module.
 
@@ -121,9 +119,7 @@ def get_suggestions():
     print("Map suggestions requested and sending to the client...")
     try:
         query = request.args.get("query")
-        d = crawler.get_suggestions(query)
-        print(d)  # TODO: Still needed?
-        return jsonify(d)
+        return jsonify(crawler.get_suggestions(query))
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": "Server Error: " + str(e)}), 400

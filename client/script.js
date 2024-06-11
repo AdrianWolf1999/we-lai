@@ -17,9 +17,11 @@ let debounceTimer;
 let heatmapPolygonCoords = [];
 let safetyScores = [];
 let safePlaceCoords = [];
+let preferredCoords = [];
 
 let heatmapPolygons = [];
 let safePlaces = [];
+let preferredPolygons = [];
 
 let metaShown = true;
 
@@ -64,6 +66,7 @@ async function getHeatmapData() {
 		heatmapPolygonCoords = heatmapData.heatmap.coordinates;
 		safetyScores = heatmapData.heatmap.safetyScores;
         safePlaceCoords = heatmapData.safePlaces.coordinates;
+        preferredCoords = heatmapData.preferred.coordinates;
 
 		createHeatmap();
     } catch (error) {
@@ -86,17 +89,25 @@ function createHeatmap() {
     for (let i in safePlaces) {
         map.removeLayer(safePlaces[i]);
     }
+    for (let i in preferredPolygons) {
+        map.removeLayer(preferredPolygons[i]);
+    }
 
     heatmapPolygons = [];
     safePlaces = [];
+    preferredPolygons = [];
     metaShown = true;
 
     for (let i in heatmapPolygonCoords) {
         heatmapPolygons.push(L.polygon(heatmapPolygonCoords[i], { color: valueToColor(safetyScores[i]), fillOpacity: 0.3, weight: 0 }).addTo(map));
     }
 
+    for (let i in preferredCoords) {
+        preferredPolygons.push(L.polygon(preferredCoords[i], { color: "#28ff65", fillOpacity: 0.3, weight: 0 }).addTo(map));
+    }
+
     for (let i in safePlaceCoords) {
-        safePlaces.push(L.circle(safePlaceCoords[i], {color: '#00ff26', fillColor: '#00ff26', fillOpacity: 0.5, weight: 0, radius: 30}).addTo(map));
+        safePlaces.push(L.circle(safePlaceCoords[i], {color: '#fff', fillColor: '#00ff26', fillOpacity: 0.8, weight: 1, radius: 20}).addTo(map));
     }
 }
 
@@ -111,12 +122,18 @@ function toggleHeatmap() {
 		for (let i in safePlaces) {
 			safePlaces[i].addTo(map);
 		}
+        for (let i in preferredPolygons) {
+			preferredPolygons[i].addTo(map);
+		}
 	} else {
 		for (let i in heatmapPolygons) {
 			map.removeLayer(heatmapPolygons[i]);
 		}
 		for (let i in safePlaces) {
 			map.removeLayer(safePlaces[i]);
+		}
+        for (let i in preferredPolygons) {
+			map.removeLayer(preferredPolygons[i]);
 		}
 	}
 }
@@ -387,6 +404,7 @@ async function sendSetPolygonToServer() {
         heatmapPolygonCoords = heatmapData.heatmap.coordinates;
         safetyScores = heatmapData.heatmap.safetyScores;
         safePlaceCoords = heatmapData.safePlaces.coordinates;
+        preferredCoords = heatmapData.preferred.coordinates;
 
         createHeatmap();
 
@@ -421,6 +439,7 @@ async function sendSetSafePlaceToServer() {
         heatmapPolygonCoords = heatmapData.heatmap.coordinates;
         safetyScores = heatmapData.heatmap.safetyScores;
         safePlaceCoords = heatmapData.safePlaces.coordinates;
+        preferredCoords = heatmapData.preferred.coordinates;
 
         createHeatmap();
 
